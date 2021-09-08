@@ -41,7 +41,11 @@ fn put_template(file_path: impl AsRef<Path>, date: Date<Local>) -> Result<(), io
     }
 
     if !is_already_written {
-        writeln!(file, "\n\n{}", template)?;
+        if !no_lines {
+            writeln!(file, "\n\n")?;
+        }
+
+        writeln!(file, "{}", template)?;
     }
 
     Ok(())
@@ -105,7 +109,11 @@ fn main() {
         .status()
         .expect("failed to run `git add {diary_path}`");
 
-    assert!(status.success(), "failed to run `git add {diary_path}`");
+    assert!(
+        status.success(),
+        "{}",
+        "failed to run `git add {diary_path}`"
+    );
 
     let status = std::process::Command::new("git")
         .current_dir(&diary_dir)
