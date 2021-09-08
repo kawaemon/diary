@@ -20,8 +20,6 @@ fn put_template(file_path: impl AsRef<Path>, date: Date<Local>) -> Result<(), io
     // TODO: i want to put more precious template
     let template = format!("## {}/{}/{}", date.year(), date.month(), date.day());
 
-    println!("{}", file_path.display());
-
     let mut file = fs::OpenOptions::new()
         .read(true)
         .append(true)
@@ -50,14 +48,12 @@ fn put_template(file_path: impl AsRef<Path>, date: Date<Local>) -> Result<(), io
 }
 
 fn main() {
-    let editor = envvar("EDITOR").unwrap_or_else(|_| DEFAULT_EDITOR.into());
-
-    let mut diary_path = envvar("DIARY_DIR")
+    let diary_dir = envvar("DIARY_DIR")
         .map(PathBuf::from)
         .unwrap_or_else(|_| get_default_diary_path());
 
-    if !diary_path.exists() {
-        fs::create_dir_all(&diary_path).expect("failed to create diary directory");
+    if !diary_dir.exists() {
+        fs::create_dir_all(&diary_dir).expect("failed to create diary directory");
     }
 
     let now = Local::now();
@@ -71,15 +67,56 @@ fn main() {
         now.date()
     };
 
+    let mut diary_path = diary_dir.clone();
+
     let filename = format!("{}{:02}.md", date.year(), date.month());
     diary_path.push(filename);
 
     put_template(&diary_path, date).expect("failed to write template");
 
-    std::process::Command::new(editor)
-        .arg(diary_path)
+    let editor = envvar("EDITOR").unwrap_or_else(|_| DEFAULT_EDITOR.into());
+    let status = std::process::Command::new(editor)
+        .arg(&diary_path)
         .spawn()
-        .unwrap()
+        .expect("failed to launch editor")
         .wait()
-        .unwrap();
+        .expect("couldn't wait for closing editor");
+
+    if !status.success() {
+        println!("editor exited with non-ok status code");
+        return;
+    }
+
+    let mut diary_git_path = diary_dir.clone();
+    diary_git_path.push(".git");
+
+    if !diary_git_path.exists() {
+        return;
+    }
+
+    let status = std::process::Command::new("git")
+        .current_dir(&diary_dir)
+        .arg("add")
+        .arg(&diary_path)
+        .status()
+        .expect("failed to run `git add {diary_path}`");
+
+    assert!(status.success(), "failed to run `git add {diary_path}`");
+
+    let status = std::process::Command::new("git")
+        .current_dir(&diary_dir)
+        .arg("commit")
+        .arg("-m")
+        .arg(format!(
+            "auto commit for {}/{}/{} diary",
+            date.year(),
+            date.month(),
+            date.day()
+        ))
+        .status()
+        .expect("failed to commit");
+
+    assert!(status.success(), "failed to commit");
+
+    println!("automatically committed");
 }
