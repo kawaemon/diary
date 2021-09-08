@@ -74,7 +74,9 @@ fn main() {
 
     put_template(&diary_path, date).expect("failed to write template");
 
-    let editor = envvar("EDITOR").unwrap_or_else(|_| DEFAULT_EDITOR.into());
+    let editor = envvar("DIARY_EDITOR")
+        .or(envvar("EDITOR"))
+        .unwrap_or_else(|_| DEFAULT_EDITOR.into());
     let status = std::process::Command::new(editor)
         .arg(&diary_path)
         .spawn()
