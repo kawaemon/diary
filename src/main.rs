@@ -77,8 +77,10 @@ fn main() {
     let editor = envvar("DIARY_EDITOR")
         .or(envvar("EDITOR"))
         .unwrap_or_else(|_| DEFAULT_EDITOR.into());
-    let status = std::process::Command::new(editor)
-        .arg(&diary_path)
+
+    let status = std::process::Command::new("sh")
+        .arg("-c")
+        .arg(&format!("{} {}", editor, diary_path.display()))
         .spawn()
         .expect("failed to launch editor")
         .wait()
